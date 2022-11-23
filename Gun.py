@@ -1,328 +1,204 @@
 import math
-import numpy as np
-from random import choice, randint
-import pygame
-import time
+import pygame as pg
+from random import randint
+import pygame.display
 
-pygame.init()
+WIDTH, HEIGHT = 500, 500
+FONE_COLOR = (155, 155, 155)
 FPS = 30
+pg.init()
+pygame.display.set_caption("_First_ Ball game")
+firstIcon = pygame.image.load('1.png')
+pygame.display.set_icon(firstIcon)
 
-RED = 0xFF0000
-BLUE = 0x0000FF
-YELLOW = 0xFFC91F
-GREEN = 0x00FF00
-MAGENTA = 0xFF03B8
-CYAN = 0x00FFCC
-BLACK = (0, 0, 0)
-WHITE = 0xFFFFFF
-GREY = 0x7D7D7D
-GAME_COLORS = [RED, BLUE, YELLOW, GREEN, MAGENTA, CYAN]
-
-WIDTH = 800
-HEIGHT = 600
-
-my_font = pygame.font.SysFont('Comic Sans MS', 30)
-trace = ([])
-fl = 1
-def draw_point(m, col, screen):
-    for [i, j] in m:
-        pygame.draw.circle(
-            screen,
-            col,
-            (i, j),
-            1
-        )
-
-def dist(x1, y1, x2, y2):
-   return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+f_score = pg.font.Font(None, 36)
+f_good_click = pg.font.Font(None, 24)
+screen = pg.display.set_mode((WIDTH, HEIGHT))
 
 class Ball:
-    def __init__(self, screen: pygame.Surface, x=40, y=450):
-        """ Конструктор класса ball
 
-        Args:
-        x - начальное положение мяча по горизонтали
-        y - начальное положение мяча по вертикали
+    def __init__(self, radius_min=10, radius_max=30, speed_max=3):
+        self.x = randint(0, WIDTH)
+        self.y = randint(0, HEIGHT)
+        self.radius = randint(radius_min, radius_max)
+        self.speed_x = randint(-speed_max, speed_max)
+        self.speed_y = randint(-speed_max, speed_max)
+        self.timeCreate = pg.time.get_ticks()
+        colors = [(255, 0, 0), (0, 255, 0)]
+        type = randint(0, 1)
+        self.type = type
+        self.color = colors[type]
+        self.speed_max = speed_max
+
+    def check_collision(self, x : int, y : int):
         """
-        self.screen = screen
-        self.x = x
-        self.y = y
-        self.radius = 9
-        self.vx = 0
-        self.vy = 0
-        self.color = choice(GAME_COLORS)
-        self.live = 30
-        self.trace = trace
-
-    def change_v(self):
-        '''
-        Функция меняет скорость у шарика
-        в зависимости от его положения(с какой именно стеной он столкнулся)
-        '''
-        k = 0.7
-        if (self.x < self.radius + 10) and (self.y < self.radius + 10):
-            self.vx = math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
-            self.vy = math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
-        elif (self.x > WIDTH - self.radius - 10) and (self.y > HEIGHT - self.radius - 10):
-            self.vx = -math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
-            self.vy = -math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
-        elif (self.x < self.radius + 10) and (self.y > HEIGHT - self.radius - 10):
-            self.vx = math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
-            self.vy = -math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
-        elif (self.x > WIDTH - self.radius - 10) and (self.y < self.radius + 10):
-            self.vx = -math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
-            self.vy = math.sqrt((self.vx ** 2 + self.vy ** 2) / 2)
-        elif (self.x < self.radius + 10) or (self.x > WIDTH - self.radius - 10):
-            self.vx = -k * self.vx
-            self.vy *= k
-        elif (self.y < self.radius + 10) or (self.y > HEIGHT - self.radius - 10):
-            self.vy = -k * self.vy
-            self.vx *= k
-
-    def is_stop(self):
-        """Проверяет не остановился лт шарик"""
-        return self.vx ** 2 + self.vy ** 2 < 1
-
-
-    def move(self):
-        """Переместить мяч по прошествии единицы времени.
-        Метод описывает перемещение мяча за один кадр перерисовки. То есть, обновляет значения
-        self.x и self.y с учетом скоростей self.vx и self.vy, силы гравитации, действующей на мяч,
-        и стен по краям окна (размер окна 800х600).
+        Проверка вхождения точки в мячик
         """
-        g = 1
+        return (x - self.x)**2 + (y - self.y)**2 <= self.radius**2
 
-        self.trace.append([self.x, self.y])
-        draw_point(trace, self.color, self.screen)
-        if not self.is_stop():
-            self.x += self.vx
-            self.vy += g
-            self.y += self.vy
-            if self.isCol():
-                self.fix_position()
-                self.change_v()
-        else:
-            self.fix_position()
-
-    def draw(self):
-        pygame.draw.circle(
-            self.screen,
-            self.color,
-            (self.x, self.y),
-            self.radius
-        )
-
-    def hittest(self, obj):
-        """Функция проверяет сталкивалкивается ли данный обьект с целью, описываемой в обьекте obj.
-
-        Args:
-            obj: Обьект, с которым проверяется столкновение.
-        Returns:
-            Возвращает True в случае столкновения мяча и цели. В противном случае возвращает False.
+    def update(self, FPS : int):
         """
-        d = dist(self.x, self.y, obj.x, obj.y)
-        if d <= 1.2*(self.radius + obj.radius):
-            return True
-        else:
-            return False
-
-    def isCol(self):
-        """Функция проверяет, сталкивалкивается ли шарик со стеной.
-        Returns:
-            Возвращает True в случае столкновения мяча и стены. В противном случае возвращает False.
+        Обработка логики шарика
         """
-        delta = 1
-        if (self.y > self.radius + delta) and (self.y < HEIGHT - self.radius - delta) and (self.x > self.radius + delta) and (
-                self.x < WIDTH - self.radius - delta):
-            return False
-        else:
-            return True
+        self.wall_collision()
 
-    def fix_position(self):
-        '''
-        Исправляет позицию шарика при коллизии,
-        чтобы избежать проблем, связанных в краевыми эффектами
-        '''
-        delta1 = 5
-        if self.x < delta1 + self.radius:
-            self.x = delta1 + self.radius
-        if self.x > WIDTH - self.radius - delta1:
-            self.x = WIDTH - self.radius - delta1
-        if self.y < delta1 + self.radius:
-            self.y = delta1 + self.radius
-        if self.y > HEIGHT - self.radius - delta1:
-            self.y = HEIGHT - self.radius - delta1
+        self.x += self.speed_x/FPS
+        self.y += self.speed_y/FPS
 
+        if self.type == 1:
+            k = 1
+            if self.speed_x < 0:
+                k = -1
+            self.speed_x =  k * self.speed_max * (0.5 + 0.5*math.sin((self.timeCreate + pg.time.get_ticks())/500))**2
+            if self.speed_y < 0:
+                k = -1
+            self.speed_y =  k * self.speed_max * (0.5 + 0.5*math.cos((self.timeCreate + pg.time.get_ticks())/500))**2
 
-def rot(an, p0, p1):
-    x1_rot = p0[0] + (p1[0] - p0[0]) * math.cos(an) - (p1[1] - p0[1]) * math.sin(an)
-    y1_rot = p0[1] + (p1[0] - p0[0]) * math.sin(an) + (p1[1] - p0[1]) * math.cos(an)
-    return np.array([x1_rot, y1_rot])
-
-
-class Gun:
-    def __init__(self, screen: pygame.Surface):
-        self.screen = screen
-        self.f2_power = 10
-        self.f2_on = 0
-        self.an = 1
-        self.color = GREY
-        self.x = 40
-        self.y = 450
-        self.length = 30
-
-    def fire2_start(self, event):
-        self.f2_on = 1
-
-    def fire2_end(self, event):
-        """Выстрел мячом.
-
-        Происходит при отпускании кнопки мыши.
-        Начальные значения компонент скорости мяча vx и vy зависят от положения мыши.
+    def getScore(self):
         """
-        global balls
-        new_ball = Ball(self.screen)
-        new_ball.radius += 5
-        self.an = math.atan2((event.pos[1]-new_ball.y), (event.pos[0]-new_ball.x))
-        new_ball.vx = self.f2_power * math.cos(self.an)
-        new_ball.vy = self.f2_power * math.sin(self.an)
-        balls.append(new_ball)
-        self.f2_on = 0
-        self.f2_power = 10
+        Возращает количество очков за мячик
+        """
+        if self.type == 1:
+            return 1
+        return 3
 
-    def targetting(self, event):
-        """Прицеливание. Зависит от положения мыши."""
-        if event:
-            if event.pos[0] - 20 != 0:
-                self.an = math.atan((event.pos[1] - 450) / (event.pos[0] - 20))
-            elif event.pos[1] < 450:
-                self.an = math.pi / 2
-            elif event.pos[1] >= 450:
-                self.an = -math.pi / 2
-        limit_len = 100
-        if self.f2_on:
-            self.color = RED
-            if self.length < limit_len:
-                self.length += 1
-        else:
-            self.length = 30
-            self.color = GREY
+    def render(self, surface : pg.Surface):
+        """
+        Отрисовывает мячик
+        """
+        pg.draw.circle(surface, self.color, (self.x, self.y), self.radius, 0)
+        pg.draw.circle(surface, self.color, (self.x, self.y), self.radius, 1)
 
-    def draw(self):
-        width = 10
-        p0 = np.array([20, 450])
-        p1 = p0 + np.array([self.length, 0])
-        p2 = p0 + np.array([0, width])
+    def wall_collision(self):
+        """
+        Проверка на столкновение со стенами
+        """
+        if self.x - self.radius < 0:
+            self.speed_x = randint(0, self.speed_max)
+        elif self.x + self.radius > WIDTH:
+            self.speed_x = randint(-self.speed_max, 0)
+        elif self.y - self.radius < 0:
+            self.speed_y = randint(0, self.speed_max)
+        elif self.y + self.radius > HEIGHT:
+            self.speed_y = randint(-self.speed_max, 0)
 
-        p1_rot = rot(self.an, p0, p1)
-        p2_rot = rot(self.an, p0, p2)
-        p3_rot = p1_rot + p2_rot - p0
-        pygame.draw.polygon(self.screen, self.color, [p2_rot, p0, p1_rot, p3_rot])
+class Word:
+    click_words = ["Good", "Nice", "Great", "Perfect", "WOW"]
+    timeLive = 1000
 
-    def power_up(self):
-        if self.f2_on:
-            if self.f2_power < 59:
-                self.f2_power += 0.7
-            self.color = RED
-        else:
-            self.color = GREY
+    def __init__(self, countGoodClick : int, time, position):
+        self.word = f_good_click.render(self.GetGoodWord(countGoodClick), True, (200, 0, 0))
+        self.time = time
+        self.position = position
 
+    def GetGoodWord(self, countGoodClick : int):
+        """
+        Возращает слово, в зависимости от количества попаданий подряд
+        """
+        l = len(self.click_words)
+        if countGoodClick >= l:
+            return self.click_words[l-1]
+        return self.click_words[countGoodClick]
 
-class Target:
-    def __init__(self, screen: pygame.Surface):
-        self.screen = screen
-        self.points = 0
-        self.live = 1
-        self.x = randint(600, 780)
-        self.y = randint(300, 550)
-        self.radius = randint(8, 20)
-        self.color = GAME_COLORS[randint(0, len(GAME_COLORS)) - 1]
+    def render(self, surface : pg.Surface):
+        """
+        Отрисовка слова
+        """
+        surface.blit(self.word, self.position)
 
-    def new_target(self):
-        """ Инициализация новой цели. """
-        self.x = randint(600, 780)
-        self.y = randint(300, 550)
-        self.radius = randint(5, 20)
-        self.live = 1
+    def update(self):
+        """
+        Обработка логики слова
+        """
+        kMove = (1 - (pg.time.get_ticks() - self.time)/ self.timeLive) / FPS
+        self.position = (self.position[0], self.position[1] - kMove)
 
-    def hit(self, points=1):
-        """Попадание шарика в цель."""
-        self.points += points
-
-    def draw(self):
-        pygame.draw.circle(
-            self.screen,
-            self.color,
-            (self.x, self.y),
-            self.radius
-        )
+    def itBe(self):
+        """Проверка истечение срока жизни слова"""
+        return pg.time.get_ticks() < self.time + self.timeLive
 
 
-pygame.init()
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-bullet = 0
+
 balls = []
-list_of_motions = []
+words = []
+lastCreate = 0
+delayCreate = 0
+good_click_count = 0
+score = 0
 
-clock = pygame.time.Clock()
-t11 = 0
-t2 = 0
-flag1 = 0
-gun = Gun(screen)
-target = Target(screen)
-finished = False
+def CreateBall():
+    """
+    Создание мячика
+    """
+    balls.append(Ball())
 
-while not finished:
-    screen.fill(WHITE)
-    gun.draw()
-    target.draw()
-    for b in balls:
-        b.draw()
+def CreateWord(goodClickCount : int, position):
+    """Создание слова"""
+    words.append(Word(goodClickCount, pg.time.get_ticks(), position))
+
+def Click(position):
+    """Обработка логики нажатия"""
+    global score, textScore, good_click_count
+    isGoodClick = False
+    for ball in balls:
+        if ball.check_collision(position[0], position[1]):
+            balls.remove(ball)
+            score += ball.getScore()
+            textScore = f_score.render("Счет: " + str(score), True, (0,0,0))
+            CreateWord(good_click_count, position)
+            isGoodClick = True
+            break
+    if isGoodClick:
+        good_click_count += 1
+    else:
+        good_click_count = 0
 
 
-    clock.tick(FPS)
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            finished = True
-        elif event.type == pygame.MOUSEBUTTONDOWN and fl != 0:
-            gun.fire2_start(event)
-            trace = ([])
-            Ball.trace = ([])
 
-        elif event.type == pygame.MOUSEBUTTONUP and fl != 0:
-            gun.fire2_end(event)
-            bullet += 1
-        elif event.type == pygame.MOUSEMOTION and fl != 0:
-            gun.targetting(event)
-            list_of_motions.append(event)
+def update():
+    """Обработка логики игры (Ядро)"""
+    global lastCreate, delayCreate, balls, FPS
 
-    if len(list_of_motions) != 0:
-        gun.targetting(list_of_motions[-1])
-    text_surface1 = my_font.render(f'Вы уничтожили цель за {bullet} выстрелов', False, (0, 0, 0))
+    for ball in balls:
+        ball.update(FPS)
 
-    text_surface2 = my_font.render(f'{target.points}', False, (0, 0, 0))
+    for word in words:
+        if not word.itBe():
+            words.remove(word)
+            continue
+        word.update()
 
-    for b in balls:
-        b.move()
-        if b.hittest(target) and target.live:
-            target.live = 0
-            t11 = time.time()
-            target.hit()
-            target.new_target()
-            flag1 = 0
+    if pg.time.get_ticks() > (lastCreate + delayCreate):
+        lastCreate = pg.time.get_ticks()
+        delayCreate = randint(1000, 2000)
+        CreateBall()
 
-    t2 = time.time()
+def render(screen):
+    """Отрисовка экрана"""
+    global balls
+    screen.fill(FONE_COLOR)
+    for ball in balls:
+        ball.render(screen)
 
-    if t2 - t11 <= 2:
-        screen.blit(text_surface1, (100, HEIGHT // 3))
-        fl = 0
-    elif flag1 == 0:
-        bullet = 0
-        balls = []
-        flag1 = 1
-        fl = 1
-    screen.blit(text_surface2, (50, 50))
-    pygame.display.update()
-    gun.power_up()
+    for word in words:
+        word.render(screen)
 
-pygame.quit()
+    screen.blit(textScore, (0,0))
+
+    pg.display.update()
+
+textScore = f_score.render("Счет: " + str(score), True, (0,0,0))
+running = True
+while running:
+
+    update()
+    render(screen)
+
+    for event in pg.event.get():
+        if event.type == pg.QUIT:
+            running = False
+        elif event.type == pg.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                Click(event.pos)
+
+pg.quit()
